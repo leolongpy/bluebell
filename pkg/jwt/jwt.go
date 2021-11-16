@@ -15,7 +15,7 @@ type MyClaims struct {
 }
 
 // GetToken 生成JWT
-func GetToken(userID int64) (string, error) {
+func GetToken(userID int64) (aToken, rToken string, err error) {
 	c := MyClaims{
 		userID,
 		jwt.StandardClaims{
@@ -25,8 +25,13 @@ func GetToken(userID int64) (string, error) {
 			Issuer: "bluebell",
 		},
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, c)
-	return token.SignedString(mySecret)
+	aToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(mySecret)
+	rToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
+		ExpiresAt: time.Now().Add(time.Hour * 24).Unix(),
+		Issuer:    "bluebell",
+	}).SignedString(mySecret)
+	return
+
 }
 
 // ParseToken 解析JWT
@@ -43,4 +48,25 @@ func ParseToken(tokenString string) (*MyClaims, error) {
 	}
 
 	return nil, errors.New("invalid token")
+}
+
+// RefreshToken 刷新AccessToken
+func RefreshToken(aToken, rToken string) (newAToken, newRToken string, err error) {
+	if _, err = jwt.Parse(rToken, func(token *jwt.Token) (interface{}, error) {
+		return mySecret, nil
+	}); err != nil {
+		return
+	}
+
+	var mc = new(MyClaims)
+	_, err = jwt.ParseWithClaims(aToken, mc, func(token *jwt.Token) (interface{}, error) {
+		return mySecret, nil
+	})
+	v, _ := err.(*jwt.ValidationError)
+
+	if v.Errors == jwt.ValidationErrorExpired {
+		return GetToken(mc.UserID)
+	}
+	return
+
 }
