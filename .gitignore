@@ -15,4 +15,7 @@
 # vendor/
 
 # goland ide
-.idea/
+/.idea/
+
+/log/
+
